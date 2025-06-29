@@ -5,87 +5,51 @@ import type React from "react"
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Home, Grid3X3, Plus, Users, User, HelpCircle, Star, X, Camera, Upload } from "lucide-react"
+import { Home, Grid3X3, Plus, Users, UserIcon, HelpCircle, Star, X, Camera, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-
-interface FishSpecies {
-  id: string
-  name: string
-  scientificName: string
-  caught: boolean
-  rarity: number
-  image?: string
-}
-
-const fishSpecies: FishSpecies[] = [
-  {
-    id: "1",
-    name: "Bluegill",
-    scientificName: "Lepomis macrochirus",
-    caught: false,
-    rarity: 2,
-  },
-  {
-    id: "2",
-    name: "Channel Catfish",
-    scientificName: "Ictalurus punctatus",
-    caught: false,
-    rarity: 3,
-  },
-  {
-    id: "3",
-    name: "Largemouth Bass",
-    scientificName: "Micropterus salmoides",
-    caught: false,
-    rarity: 4,
-  },
-  {
-    id: "4",
-    name: "Rainbow Trout",
-    scientificName: "Oncorhynchus mykiss",
-    caught: false,
-    rarity: 3,
-  },
-  {
-    id: "5",
-    name: "Northern Pike",
-    scientificName: "Esox lucius",
-    caught: false,
-    rarity: 5,
-  },
-  {
-    id: "6",
-    name: "Walleye",
-    scientificName: "Sander vitreus",
-    caught: false,
-    rarity: 4,
-  },
-]
+import { AuthWrapper } from "@/components/auth-wrapper"
+import { useFishData } from "@/hooks/use-fish-data"
+import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 type FilterType = "all" | "caught" | "missing"
 
 export default function FishingCollection() {
+  return <AuthWrapper>{(user) => <FishingCollectionContent user={user} />}</AuthWrapper>
+}
+
+function FishingCollectionContent({ user }: { user: SupabaseUser }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all")
   const [activeTab, setActiveTab] = useState("collection")
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
-  const caughtCount = fishSpecies.filter((fish) => fish.caught).length
+  const { fishSpecies, catches, loading, addCatch, uploadCatchPhoto } = useFishData(user.id)
+
+  // Get caught species IDs
+  const caughtSpeciesIds = new Set(catches.map((catchItem) => catchItem.species_id))
+
+  // Calculate progress
+  const caughtCount = caughtSpeciesIds.size
   const totalCount = fishSpecies.length
-  const completionPercentage = Math.round((caughtCount / totalCount) * 100)
+  const completionPercentage = totalCount > 0 ? Math.round((caughtCount / totalCount) * 100) : 0
 
+  // Filter fish based on caught status
   const filteredFish = fishSpecies.filter((fish) => {
-    if (activeFilter === "caught") return fish.caught
-    if (activeFilter === "missing") return !fish.caught
+    const isCaught = caughtSpeciesIds.has(fish.id)
+    if (activeFilter === "caught") return isCaught
+    if (activeFilter === "missing") return !isCaught
     return true
   })
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
+      setUploadedFile(file)
       const reader = new FileReader()
       reader.onload = (e) => {
         setUploadedImage(e.target?.result as string)
@@ -94,18 +58,102 @@ export default function FishingCollection() {
     }
   }
 
-  const handleSubmitCatch = (event: React.FormEvent) => {
+  const handleSubmitCatch = async (event: React.FormEvent) => {
     event.preventDefault()
-    // Here you would typically send the data to your backend
-    console.log("Submitting catch...")
-    setShowUploadForm(false)
-    setUploadedImage(null)
+    if (!uploadedFile) {
+      alert("Please upload a photo of your catch")
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const formData = new FormData(event.target as HTMLFormElement)
+
+      // Upload photo
+      const photoUrl = await uploadCatchPhoto(uploadedFile, user.id)
+
+      // Create catch record
+      const catchData = {
+        user_id: user.id,
+        species_id: fishSpecies[0]?.id || "", // For now, default to first species
+        photo_url: photoUrl,
+        location: formData.get("location") as string,
+        length_inches: formData.get("length") ? Number.parseFloat(formData.get("length") as string) : null,
+        weight_lbs: formData.get("weight") ? Number.parseFloat(formData.get("weight") as string) : null,
+        bait_used: formData.get("bait") as string,
+        notes: formData.get("notes") as string,
+        caught_at: `${formData.get("date")}T${formData.get("time")}:00Z`,
+      }
+
+      await addCatch(catchData)
+
+      // Reset form
+      setShowUploadForm(false)
+      setUploadedImage(null)
+      setUploadedFile(null)
+
+      alert("Catch added successfully!")
+    } catch (error) {
+      console.error("Error submitting catch:", error)
+      alert("Error adding catch. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
+  // Rest of the component remains the same, but update the fish mapping to use real data
   const renderStars = (rarity: number) => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star key={i} className={`w-3 h-3 ${i < rarity ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`} />
     ))
+  }
+
+  const renderFishCard = (fish: (typeof fishSpecies)[0]) => {
+    const isCaught = caughtSpeciesIds.has(fish.id)
+    const userCatch = catches.find((catchItem) => catchItem.species_id === fish.id)
+
+    return (
+      <Card key={fish.id} className="overflow-hidden hover:shadow-md transition-shadow">
+        <CardContent className="p-0">
+          <div className="aspect-square bg-gray-100 flex items-center justify-center">
+            {isCaught && userCatch?.photo_url ? (
+              <img
+                src={userCatch.photo_url || "/placeholder.svg"}
+                alt={fish.name}
+                className="w-full h-full object-cover"
+              />
+            ) : isCaught ? (
+              <div className="w-full h-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
+                <span className="text-white text-2xl">🐟</span>
+              </div>
+            ) : (
+              <HelpCircle className="w-12 h-12 text-gray-400" />
+            )}
+          </div>
+          <div className="p-3">
+            <h3 className="font-semibold text-gray-900 mb-1">{fish.name}</h3>
+            <p className="text-xs text-gray-500 italic mb-2">{fish.scientific_name}</p>
+            <div className="flex items-center justify-between">
+              <span className={`text-xs ${isCaught ? "text-green-600" : "text-gray-500"}`}>
+                {isCaught ? "Caught" : "Not caught"}
+              </span>
+              <div className="flex items-center gap-0.5">{renderStars(fish.rarity)}</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your collection...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -165,33 +213,7 @@ export default function FishingCollection() {
 
       {/* Fish Grid */}
       <div className="px-4 pb-24">
-        <div className="grid grid-cols-2 gap-4">
-          {filteredFish.map((fish) => (
-            <Card key={fish.id} className="overflow-hidden hover:shadow-md transition-shadow">
-              <CardContent className="p-0">
-                <div className="aspect-square bg-gray-100 flex items-center justify-center">
-                  {fish.caught ? (
-                    <div className="w-full h-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
-                      <span className="text-white text-2xl">🐟</span>
-                    </div>
-                  ) : (
-                    <HelpCircle className="w-12 h-12 text-gray-400" />
-                  )}
-                </div>
-                <div className="p-3">
-                  <h3 className="font-semibold text-gray-900 mb-1">{fish.name}</h3>
-                  <p className="text-xs text-gray-500 italic mb-2">{fish.scientificName}</p>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-xs ${fish.caught ? "text-green-600" : "text-gray-500"}`}>
-                      {fish.caught ? "Caught" : "Not caught"}
-                    </span>
-                    <div className="flex items-center gap-0.5">{renderStars(fish.rarity)}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <div className="grid grid-cols-2 gap-4">{filteredFish.map(renderFishCard)}</div>
       </div>
 
       {/* Bottom Navigation */}
@@ -202,7 +224,7 @@ export default function FishingCollection() {
             { key: "collection", icon: Grid3X3, label: "Collection" },
             { key: "add", icon: Plus, label: "", isSpecial: true },
             { key: "social", icon: Users, label: "Social" },
-            { key: "profile", icon: User, label: "Profile" },
+            { key: "profile", icon: UserIcon, label: "Profile" },
           ].map(({ key, icon: Icon, label, isSpecial }) => (
             <button
               key={key}
@@ -339,8 +361,8 @@ export default function FishingCollection() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1 bg-blue-500 hover:bg-blue-600">
-                  Add Catch
+                <Button type="submit" className="flex-1 bg-blue-500 hover:bg-blue-600" disabled={submitting}>
+                  {submitting ? "Adding Catch..." : "Add Catch"}
                 </Button>
               </div>
             </form>
