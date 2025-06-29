@@ -1,12 +1,16 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { HelpCircle, Star } from "lucide-react"
+import { HelpCircle, Star, Search, X } from "lucide-react"
 import { AuthWrapper } from "@/components/auth-wrapper"
 import { useFishData } from "@/hooks/use-fish-data"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
+import { SearchSuggestions } from "@/components/search-suggestions"
+import { useSearchHistory } from "@/hooks/use-search-history"
 
 type FilterType = "all" | "caught" | "missing"
 
@@ -16,7 +20,10 @@ export default function CollectionPage() {
 
 function CollectionContent({ user }: { user: SupabaseUser }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all")
+  const [searchQuery, setSearchQuery] = useState("")
   const { fishSpecies, catches, loading } = useFishData(user.id)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const { searchHistory, addToHistory } = useSearchHistory()
 
   // Get caught species IDs
   const caughtSpeciesIds = new Set(catches.map((catchItem) => catchItem.species_id))
@@ -26,12 +33,22 @@ function CollectionContent({ user }: { user: SupabaseUser }) {
   const totalCount = fishSpecies.length
   const completionPercentage = totalCount > 0 ? Math.round((caughtCount / totalCount) * 100) : 0
 
-  // Filter fish based on caught status
+  // Filter fish based on caught status and search query
   const filteredFish = fishSpecies.filter((fish) => {
     const isCaught = caughtSpeciesIds.has(fish.id)
-    if (activeFilter === "caught") return isCaught
-    if (activeFilter === "missing") return !isCaught
-    return true
+
+    // Filter by caught status
+    let statusMatch = true
+    if (activeFilter === "caught") statusMatch = isCaught
+    if (activeFilter === "missing") statusMatch = !isCaught
+
+    // Filter by search query
+    const searchMatch =
+      searchQuery === "" ||
+      fish.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      fish.scientific_name.toLowerCase().includes(searchQuery.toLowerCase())
+
+    return statusMatch && searchMatch
   })
 
   const renderStars = (rarity: number) => {
@@ -92,6 +109,20 @@ function CollectionContent({ user }: { user: SupabaseUser }) {
         </CardContent>
       </Card>
     )
+  }
+
+  const handleSelectFish = (fishName: string) => {
+    setSearchQuery(fishName)
+    setShowSuggestions(false)
+    addToHistory(fishName)
+  }
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      addToHistory(searchQuery.trim())
+      setShowSuggestions(false)
+    }
   }
 
   if (loading) {
@@ -169,6 +200,43 @@ function CollectionContent({ user }: { user: SupabaseUser }) {
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="px-4 mb-4">
+        <form onSubmit={handleSearchSubmit} className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search fish species..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            className="w-full pl-10 pr-10 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("")
+                setShowSuggestions(false)
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
+          {showSuggestions && (
+            <SearchSuggestions
+              fishSpecies={fishSpecies}
+              searchQuery={searchQuery}
+              onSelectFish={handleSelectFish}
+              caughtSpeciesIds={caughtSpeciesIds}
+            />
+          )}
+        </form>
+      </div>
+
       {/* Filter Tabs */}
       <div className="px-4 mb-4">
         <div className="flex bg-white rounded-lg p-1 shadow-sm">
@@ -198,22 +266,31 @@ function CollectionContent({ user }: { user: SupabaseUser }) {
         ) : (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
-              {activeFilter === "caught" ? "🎣" : activeFilter === "missing" ? "❓" : "🐟"}
+              {searchQuery ? "🔍" : activeFilter === "caught" ? "🎣" : activeFilter === "missing" ? "❓" : "🐟"}
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {activeFilter === "caught"
-                ? "No catches yet!"
-                : activeFilter === "missing"
-                  ? "All species caught!"
-                  : "No species found"}
+              {searchQuery
+                ? "No fish found"
+                : activeFilter === "caught"
+                  ? "No catches yet!"
+                  : activeFilter === "missing"
+                    ? "All species caught!"
+                    : "No species found"}
             </h3>
             <p className="text-gray-600 text-sm">
-              {activeFilter === "caught"
-                ? "Start fishing to build your collection"
-                : activeFilter === "missing"
-                  ? "Congratulations on completing your collection!"
-                  : "Check back later for more species"}
+              {searchQuery
+                ? `No fish species match "${searchQuery}"`
+                : activeFilter === "caught"
+                  ? "Start fishing to build your collection"
+                  : activeFilter === "missing"
+                    ? "Congratulations on completing your collection!"
+                    : "Check back later for more species"}
             </p>
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="mt-3 text-blue-500 hover:underline text-sm">
+                Clear search
+              </button>
+            )}
           </div>
         )}
       </div>
