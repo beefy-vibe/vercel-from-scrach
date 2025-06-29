@@ -35,6 +35,10 @@ export default function DemoPage() {
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [showBookingModal, setShowBookingModal] = useState(false)
+  const [selectedCaptain, setSelectedCaptain] = useState<any>(null)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [bookingNotes, setBookingNotes] = useState("")
 
   // Get caught species IDs from mock data
   const caughtSpeciesIds = new Set(mockCatches.map((catchItem) => catchItem.species_id))
@@ -197,6 +201,11 @@ export default function DemoPage() {
     }
 
     if (activeTab === "captain") {
+      const handleBookTrip = (captain: any) => {
+        setSelectedCaptain(captain)
+        setShowBookingModal(true)
+      }
+
       return (
         <div className="px-4 pt-4 pb-24">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Find a Captain</h2>
@@ -313,7 +322,11 @@ export default function DemoPage() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Button size="sm" className="flex-1 bg-blue-500 hover:bg-blue-600">
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-blue-500 hover:bg-blue-600"
+                          onClick={() => handleBookTrip(captain)}
+                        >
                           Book Trip
                         </Button>
                         <Button size="sm" variant="outline" className="flex-1 bg-transparent">
@@ -619,6 +632,177 @@ export default function DemoPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Booking Modal */}
+      {showBookingModal && selectedCaptain && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-white w-full max-w-md mx-4 rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-lg font-semibold">Book with {selectedCaptain.name}</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowBookingModal(false)
+                  setSelectedCaptain(null)
+                  setSelectedDate(null)
+                  setBookingNotes("")
+                }}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="p-4 space-y-6">
+              {/* Captain Summary */}
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <img
+                  src={selectedCaptain.image || "/placeholder.svg"}
+                  alt={selectedCaptain.name}
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-gray-900">{selectedCaptain.name}</h3>
+                  <p className="text-sm text-gray-600">📍 {selectedCaptain.location}</p>
+                  <p className="text-sm font-semibold text-blue-600">{selectedCaptain.price}</p>
+                </div>
+              </div>
+
+              {/* Calendar */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Select Date</Label>
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="grid grid-cols-7 gap-1 mb-4">
+                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                      <div key={day} className="text-center text-xs font-medium text-gray-500 py-2">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {Array.from({ length: 31 }, (_, i) => {
+                      const day = i + 1
+                      const currentDate = new Date()
+                      const thisDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
+                      const isSelected =
+                        selectedDate &&
+                        selectedDate.getDate() === day &&
+                        selectedDate.getMonth() === currentDate.getMonth()
+                      const isPast =
+                        thisDate < new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          disabled={isPast}
+                          onClick={() => setSelectedDate(thisDate)}
+                          className={`
+                      aspect-square flex items-center justify-center text-sm rounded-lg transition-colors
+                      ${
+                        isSelected
+                          ? "bg-blue-500 text-white"
+                          : isPast
+                            ? "text-gray-300 cursor-not-allowed"
+                            : "hover:bg-blue-50 text-gray-900"
+                      }
+                    `}
+                        >
+                          {day}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {selectedDate && (
+                    <p className="text-sm text-blue-600 font-medium">
+                      Selected:{" "}
+                      {selectedDate.toLocaleDateString("en-US", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </p>
+                  )}
+                </div>
+
+                {/* Notes/Queries */}
+                <div className="space-y-3">
+                  <Label htmlFor="booking-notes" className="text-base font-semibold">
+                    Notes & Queries
+                  </Label>
+                  <textarea
+                    id="booking-notes"
+                    value={bookingNotes}
+                    onChange={(e) => setBookingNotes(e.target.value)}
+                    placeholder="Any special requests, questions, or details about your trip..."
+                    rows={4}
+                    className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Let the captain know about group size, experience level, target species, or any questions you have.
+                  </p>
+                </div>
+
+                {/* Booking Summary */}
+                <div className="bg-blue-50 p-4 rounded-lg space-y-2">
+                  <h4 className="font-semibold text-gray-900">Booking Summary</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Captain:</span>
+                      <span className="font-medium">{selectedCaptain.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Date:</span>
+                      <span className="font-medium">
+                        {selectedDate ? selectedDate.toLocaleDateString() : "Not selected"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Price:</span>
+                      <span className="font-medium">{selectedCaptain.price}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 bg-transparent"
+                    onClick={() => {
+                      setShowBookingModal(false)
+                      setSelectedCaptain(null)
+                      setSelectedDate(null)
+                      setBookingNotes("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1 bg-blue-500 hover:bg-blue-600"
+                    disabled={!selectedDate}
+                    onClick={() => {
+                      if (selectedDate) {
+                        alert(
+                          `Booking request sent to ${selectedCaptain.name} for ${selectedDate.toLocaleDateString()}!`,
+                        )
+                        setShowBookingModal(false)
+                        setSelectedCaptain(null)
+                        setSelectedDate(null)
+                        setBookingNotes("")
+                      }
+                    }}
+                  >
+                    Send Request
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
