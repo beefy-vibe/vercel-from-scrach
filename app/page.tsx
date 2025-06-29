@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Home, Grid3X3, Plus, Users, UserIcon, HelpCircle, Star, X, Camera, Upload } from "lucide-react"
+import { Home, Grid3X3, Plus, Users, UserIcon, HelpCircle, Star, X, Camera, Upload, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -221,6 +221,7 @@ function FishingCollectionContent({ user }: { user: SupabaseUser }) {
         <div className="flex items-center justify-around">
           {[
             { key: "feed", icon: Home, label: "Feed" },
+            { key: "search", icon: Search, label: "Search" },
             { key: "collection", icon: Grid3X3, label: "Collection" },
             { key: "add", icon: Plus, label: "", isSpecial: true },
             { key: "social", icon: Users, label: "Social" },
