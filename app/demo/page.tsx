@@ -196,6 +196,152 @@ export default function DemoPage() {
       )
     }
 
+    if (activeTab === "captain") {
+      return (
+        <div className="px-4 pt-4 pb-24">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Find a Captain</h2>
+
+          {/* Search Bar for Captains */}
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search by location or captain name..."
+                className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Featured Captains */}
+          <div className="space-y-4">
+            {[
+              {
+                id: 1,
+                name: "Captain Mike Johnson",
+                location: "Lake Michigan, Chicago",
+                rating: 4.9,
+                reviews: 127,
+                specialties: ["Bass", "Walleye", "Pike"],
+                price: "$350/day",
+                image: "/placeholder.svg?height=80&width=80",
+                verified: true,
+              },
+              {
+                id: 2,
+                name: "Captain Sarah Chen",
+                location: "Gulf Coast, Florida",
+                rating: 4.8,
+                reviews: 89,
+                specialties: ["Redfish", "Snook", "Tarpon"],
+                price: "$450/day",
+                image: "/placeholder.svg?height=80&width=80",
+                verified: true,
+              },
+              {
+                id: 3,
+                name: "Captain Tom Rodriguez",
+                location: "Pacific Coast, California",
+                rating: 4.7,
+                reviews: 156,
+                specialties: ["Salmon", "Tuna", "Rockfish"],
+                price: "$400/day",
+                image: "/placeholder.svg?height=80&width=80",
+                verified: false,
+              },
+            ].map((captain) => (
+              <Card key={captain.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex gap-4">
+                    <div className="relative">
+                      <img
+                        src={captain.image || "/placeholder.svg"}
+                        alt={captain.name}
+                        className="w-20 h-20 rounded-full object-cover"
+                      />
+                      {captain.verified && (
+                        <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white rounded-full p-1">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                            {captain.name}
+                            {captain.verified && (
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
+                                Verified
+                              </Badge>
+                            )}
+                          </h3>
+                          <p className="text-sm text-gray-600">📍 {captain.location}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-gray-900">{captain.price}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3 h-3 ${i < Math.floor(captain.rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {captain.rating} ({captain.reviews} reviews)
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {captain.specialties.map((specialty) => (
+                          <Badge key={specialty} variant="outline" className="text-xs">
+                            {specialty}
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1 bg-blue-500 hover:bg-blue-600">
+                          Book Trip
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 bg-transparent">
+                          View Profile
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Quick Filters */}
+          <div className="mt-6">
+            <h3 className="font-semibold text-gray-900 mb-3">Popular Locations</h3>
+            <div className="flex flex-wrap gap-2">
+              {["Lake Michigan", "Gulf Coast", "Pacific Coast", "Great Lakes", "Florida Keys"].map((location) => (
+                <Button key={location} variant="outline" size="sm" className="bg-transparent">
+                  {location}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     if (activeTab === "social") {
       return (
         <div className="px-4 pt-4 pb-24">
@@ -320,8 +466,8 @@ export default function DemoPage() {
               ? "Search"
               : activeTab === "feed"
                 ? "Feed"
-                : activeTab === "social"
-                  ? "Social"
+                : activeTab === "captain"
+                  ? "Find a Captain"
                   : "Profile"}
         </h1>
         {activeTab === "collection" && (
@@ -342,7 +488,7 @@ export default function DemoPage() {
             { key: "search", icon: Search, label: "Search" },
             { key: "collection", icon: Grid3X3, label: "Collection" },
             { key: "add", icon: Plus, label: "", isSpecial: true },
-            { key: "social", icon: Users, label: "Social" },
+            { key: "captain", icon: Users, label: "Find Captain" },
             { key: "profile", icon: UserIcon, label: "Profile" },
           ].map(({ key, icon: Icon, label, isSpecial }) => (
             <button
